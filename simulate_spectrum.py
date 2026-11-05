@@ -719,6 +719,9 @@ def main():
             evt_grp = h5_events.create_group(str(i))
             evt_grp.attrs['recoil_energy'] = energy
             evt_grp.attrs['recoil_type'] = rtype
+            evt_grp.attrs['vertex_x'] = vtx[0]
+            evt_grp.attrs['vertex_y'] = vtx[1]
+            evt_grp.attrs['vertex_z'] = vtx[2]
             for ch, ch_key in enumerate(channel_keys):
                 if raw[ch] is None:
                     continue
