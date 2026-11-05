@@ -32,6 +32,8 @@ structure of npz file (always saved):
     spectrum_mode        — string, one of mono/flat/wimp/custom
     detector_config      — dict, snapshot of all configuration constants
 
+    vertex_positions      — (n_events, 3) float64, primary vertex (x, y, z) in cm
+
     with --per_sensor:
         sensor_det_energy — (n_events, 4, n_sensors) float64, detected energy per channel per sensor
         sensor_det_count  — (n_events, 4, n_sensors) float64, detected count per channel per sensor
@@ -343,7 +345,7 @@ def simulate_event(detector, energy, recoil_type, save_per_sensor=False,
         if save_raw:
             raw_signals[3] = (sig, qp_weight)
 
-    return n_generated, det_energy, det_count, mean_time, sensor_energy, sensor_count, sensor_time, raw_signals
+    return n_generated, det_energy, det_count, mean_time, sensor_energy, sensor_count, sensor_time, raw_signals, (x, y, z)
 
 
 def generate_energies(args):
@@ -673,6 +675,7 @@ def main():
     detected_count = np.zeros((n_total, 4))
     mean_arrival_time = np.full((n_total, 4), np.nan)
     wimp_mass_labels = np.full(n_total, np.nan)
+    vertex_positions = np.zeros((n_total, 3))
 
     if args.per_sensor:
         sensor_det_energy = np.zeros((n_total, 4, nsensors))
@@ -699,10 +702,11 @@ def main():
         recoil_types[i] = 0 if rtype == "ER" else 1
         wimp_mass_labels[i] = wmass
 
-        n_gen, det_e, det_c, m_time, s_e, s_c, s_t, raw = simulate_event(
+        n_gen, det_e, det_c, m_time, s_e, s_c, s_t, raw, vtx = simulate_event(
             detector, energy, rtype, save_per_sensor=args.per_sensor,
             save_raw=args.save_raw)
         n_quanta_generated[i] = n_gen
+        vertex_positions[i] = vtx
         detected_energy[i] = det_e
         detected_count[i] = det_c
         mean_arrival_time[i] = m_time
@@ -742,6 +746,7 @@ def main():
         spectrum_mode=np.array(args.spectrum),
         detector_config=np.array(get_detector_config()),
         random_seed=np.array(args.seed if args.seed is not None else -1),
+        vertex_positions=vertex_positions,
     )
 
     if args.per_sensor:
