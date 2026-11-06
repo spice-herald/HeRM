@@ -15,8 +15,12 @@ Usage examples:
 key flags
 
 --per_sensor --> save per sensor hits and timing
---max_qp 100000 --> set max QPs to propagate before reweighitng (default is 100K)
+--max_qp 100000 --> set max QPs to propagate before reweighting (default is 100K)
 --save_raw --> save full per-quanta arrival times and energies to HDF5 (.h5) file
+--geometry HeRALD_LBNL --> override detector geometry (auto-sets fill_height, cell_radius)
+
+All detector configuration parameters (reflection probs, Fano factors, step size, etc.)
+can be overridden from the command line. Run with --help for the full list.
 
 structure of npz file (always saved):
     recoil_energies      — (n_events,) float64, recoil energy in eV
@@ -27,6 +31,8 @@ structure of npz file (always saved):
     mean_arrival_time    — (n_events, 4) float64, mean arrival time per channel (µs), NaN if no hits
     spectrum_mode        — string, one of mono/flat/wimp/custom
     detector_config      — dict, snapshot of all configuration constants
+
+    vertex_positions      — (n_events, 3) float64, primary vertex (x, y, z) in cm
 
     with --per_sensor:
         sensor_det_energy — (n_events, 4, n_sensors) float64, detected energy per channel per sensor
@@ -58,16 +64,32 @@ import HeST as H
 # ============================================================
 # DETECTOR CONFIGURATION — edit this section before running
 # ============================================================
-DETECTOR_GEOMETRY = "HeRALD_v1"     # Options: HeRALD_v1, HeRALD_v1_monolithic,
-                                    #          HeRALD_LBNL, HeRALD_UMass_splitCPD,
-                                    #          HeRALD_UMass_monolithic
-FILL_HEIGHT = 4.5                   # Helium fill height in cm
-CELL_RADIUS = 3.5                   # Cell radius in cm (used for position sampling)
+DETECTOR_GEOMETRY = "HeRALD_LBNL_TopOnly"   # Options: HeRALD_v1, HeRALD_v1_monolithic,
+                                            #          HeRALD_LBNL, HeRALD_LBNL_TopOnly,
+                                            #          HeRALD_UMass_splitCPD, HeRALD_UMass_monolithic
+
+# Geometry-matched defaults for fill height and cell radius.
+# Set to None to use the built-in default for the chosen geometry,
+# or override with a specific value.
+_GEOMETRY_DEFAULTS = {
+    "HeRALD_v1":              {"fill_height": 4.8, "cell_radius": 3.5},
+    "HeRALD_v1_monolithic":   {"fill_height": 4.8, "cell_radius": 3.5},
+    "HeRALD_LBNL":            {"fill_height": 3.0, "cell_radius": 2.381},
+    "HeRALD_LBNL_TopOnly":    {"fill_height": 3.0, "cell_radius": 2.381},
+    "HeRALD_UMass_splitCPD":  {"fill_height": 2.7, "cell_radius": 3.5},
+    "HeRALD_UMass_monolithic":{"fill_height": 2.77,"cell_radius": 3.5},
+}
+_defaults = _GEOMETRY_DEFAULTS.get(DETECTOR_GEOMETRY, {"fill_height": 4.8, "cell_radius": 3.5})
+FILL_HEIGHT = _defaults["fill_height"]   # Helium fill height in cm (auto from geometry)
+CELL_RADIUS = _defaults["cell_radius"]   # Cell radius in cm (auto from geometry)
 
 # QP channel parameters
 QP_WALL_REFLECTION_PROB = 0.3       # Probability of QP reflecting off walls
 QP_WALL_DIFFUSE_PROB = 0.0          # Fraction of QP reflections that are diffuse
+QP_WALL_ANDREEV_PROB = 0.0          # Probability of Andreev reflection off walls
 QP_SENSOR_REFLECTION_PROB = 0.0     # Probability of QP reflecting off sensors
+QP_SENSOR_DIFFUSE_PROB = 0.0        # Fraction of QP sensor reflections that are diffuse
+QP_SENSOR_ANDREEV_PROB = 0.0        # Probability of Andreev reflection off sensors
 
 # VUV photon channel parameters (~80 nm singlet / triplet fluorescence)
 VUV_PHOTON_ENERGY = 16.0            # eV; He₂* excimer emission energy
@@ -121,7 +143,14 @@ def get_detector_config():
         cell_radius=CELL_RADIUS,
         qp_wall_reflection_prob=QP_WALL_REFLECTION_PROB,
         qp_wall_diffuse_prob=QP_WALL_DIFFUSE_PROB,
+        qp_wall_andreev_prob=QP_WALL_ANDREEV_PROB,
         qp_sensor_reflection_prob=QP_SENSOR_REFLECTION_PROB,
+        qp_sensor_diffuse_prob=QP_SENSOR_DIFFUSE_PROB,
+        qp_sensor_andreev_prob=QP_SENSOR_ANDREEV_PROB,
+        maxon_momentum=H.MAXON_MOMENTUM,
+        roton_min_momentum=H.ROTON_MIN_MOMENTUM,
+        phonon_evap_onset=H.PHONON_EVAP_ONSET,
+        max_stable_momentum=H.MAX_STABLE_MOMENTUM,
         uv_wall_reflection_prob=UV_WALL_REFLECTION_PROB,
         uv_wall_diffuse_prob=UV_WALL_DIFFUSE_PROB,
         vuv_photon_energy=VUV_PHOTON_ENERGY,
@@ -154,6 +183,7 @@ def build_detector():
         "HeRALD_v1": H.HeRALD_v1,
         "HeRALD_v1_monolithic": H.HeRALD_v1_monolithic,
         "HeRALD_LBNL": H.HeRALD_LBNL,
+        "HeRALD_LBNL_TopOnly": H.HeRALD_LBNL_TopOnly,
         "HeRALD_UMass_splitCPD": H.HeRALD_UMass_splitCPD,
         "HeRALD_UMass_monolithic": H.HeRALD_UMass_monolithic,
     }
@@ -165,7 +195,10 @@ def build_detector():
 
     detector.set_QP_wall_reflection_prob(QP_WALL_REFLECTION_PROB)
     detector.set_QP_wall_diffuse_prob(QP_WALL_DIFFUSE_PROB)
+    detector.set_QP_wall_Andreev_prob(QP_WALL_ANDREEV_PROB)
     detector.set_QP_sensor_reflection_prob(QP_SENSOR_REFLECTION_PROB)
+    detector.set_QP_sensor_diffuse_prob(QP_SENSOR_DIFFUSE_PROB)
+    detector.set_QP_sensor_Andreev_prob(QP_SENSOR_ANDREEV_PROB)
     detector.set_vuv_photon_energy(VUV_PHOTON_ENERGY)
     detector.set_UV_wall_reflection_prob(UV_WALL_REFLECTION_PROB)
     detector.set_UV_wall_diffuse_prob(UV_WALL_DIFFUSE_PROB)
@@ -312,7 +345,7 @@ def simulate_event(detector, energy, recoil_type, save_per_sensor=False,
         if save_raw:
             raw_signals[3] = (sig, qp_weight)
 
-    return n_generated, det_energy, det_count, mean_time, sensor_energy, sensor_count, sensor_time, raw_signals
+    return n_generated, det_energy, det_count, mean_time, sensor_energy, sensor_count, sensor_time, raw_signals, (x, y, z)
 
 
 def generate_energies(args):
@@ -421,32 +454,191 @@ def main():
                         help="Save per-sensor energy and count arrays (shape: n_events x 4 x n_sensors)")
     parser.add_argument("--save_raw", action="store_true",
                         help="Save full per-quanta arrival times and energies to HDF5 (.h5) file")
-    parser.add_argument("--max_qp", type=int, default=None,
-                        help="Max QPs to simulate per event (overrides config block)")
     parser.add_argument("--output", default=None,
                         help="Output file path (auto-generated from parameters if omitted)")
-    parser.add_argument("--fano_singlet", type=float, default=None,
-                        help="Fano factor for singlet channel (overrides config block)")
-    parser.add_argument("--fano_triplet", type=float, default=None,
-                        help="Fano factor for triplet channel (overrides config block)")
-    parser.add_argument("--fano_ir", type=float, default=None,
-                        help="Fano factor for IR channel (overrides config block)")
     parser.add_argument("--seed", type=int, default=None,
                         help="Random seed for reproducibility")
+
+    # --- Detector configuration overrides (default=None means use in-file default) ---
+    det = parser.add_argument_group("detector configuration",
+                                    "Override any detector parameter (defaults from config block)")
+    det.add_argument("--geometry", default=None,
+                     choices=list(_GEOMETRY_DEFAULTS.keys()),
+                     help="Detector geometry (also sets fill_height/cell_radius defaults)")
+    det.add_argument("--fill_height", type=float, default=None,
+                     help="Helium fill height in cm")
+    det.add_argument("--cell_radius", type=float, default=None,
+                     help="Cell radius in cm")
+
+    det.add_argument("--qp_wall_refl", type=float, default=None,
+                     help="QP wall reflection probability")
+    det.add_argument("--qp_wall_diffuse", type=float, default=None,
+                     help="QP wall diffuse reflection fraction")
+    det.add_argument("--qp_wall_andreev", type=float, default=None,
+                     help="QP wall Andreev reflection probability")
+    det.add_argument("--qp_sensor_refl", type=float, default=None,
+                     help="QP sensor reflection probability")
+    det.add_argument("--qp_sensor_diffuse", type=float, default=None,
+                     help="QP sensor diffuse reflection fraction")
+    det.add_argument("--qp_sensor_andreev", type=float, default=None,
+                     help="QP sensor Andreev reflection probability")
+    det.add_argument("--qp_temperature", type=float, default=None,
+                     help="QP momentum sampling temperature (K)")
+    det.add_argument("--max_qp", type=int, default=None,
+                     help="Max QPs to simulate per event (downsample & weight if exceeded)")
+
+    det.add_argument("--vuv_photon_energy", type=float, default=None,
+                     help="VUV photon energy in eV")
+    det.add_argument("--uv_wall_refl", type=float, default=None,
+                     help="UV wall reflection probability")
+    det.add_argument("--uv_wall_diffuse", type=float, default=None,
+                     help="UV wall diffuse reflection fraction")
+    det.add_argument("--uv_sensor_refl", type=float, default=None,
+                     help="UV sensor reflection probability")
+    det.add_argument("--uv_sensor_diffuse", type=float, default=None,
+                     help="UV sensor diffuse reflection fraction")
+    det.add_argument("--uv_rayleigh_mfp", type=float, default=None,
+                     help="UV Rayleigh scattering mean free path in cm")
+
+    det.add_argument("--ir_ion_wall_refl", type=float, default=None,
+                     help="IR ionization wall reflection probability")
+    det.add_argument("--ir_ion_wall_diffuse", type=float, default=None,
+                     help="IR ionization wall diffuse fraction")
+    det.add_argument("--ir_ion_sensor_refl", type=float, default=None,
+                     help="IR ionization sensor reflection probability")
+    det.add_argument("--ir_ion_sensor_diffuse", type=float, default=None,
+                     help="IR ionization sensor diffuse fraction")
+    det.add_argument("--ir_exc_wall_refl", type=float, default=None,
+                     help="IR excitation wall reflection probability")
+    det.add_argument("--ir_exc_wall_diffuse", type=float, default=None,
+                     help="IR excitation wall diffuse fraction")
+    det.add_argument("--ir_exc_sensor_refl", type=float, default=None,
+                     help="IR excitation sensor reflection probability")
+    det.add_argument("--ir_exc_sensor_diffuse", type=float, default=None,
+                     help="IR excitation sensor diffuse fraction")
+
+    det.add_argument("--triplet_fluorescence_yield", type=float, default=None,
+                     help="Triplet fluorescence yield (0-1)")
+    det.add_argument("--singlet_fraction", type=float, default=None,
+                     help="Singlet fraction of UV energy (None=use yield curves)")
+
+    det.add_argument("--fano_singlet", type=float, default=None,
+                     help="Fano factor for singlet channel")
+    det.add_argument("--fano_triplet", type=float, default=None,
+                     help="Fano factor for triplet channel")
+    det.add_argument("--fano_ir", type=float, default=None,
+                     help="Fano factor for IR channel")
+
+    det.add_argument("--step_size", type=float, default=None,
+                     help="Ray-marching step size in cm")
+    det.add_argument("--max_dist", type=float, default=None,
+                     help="Maximum propagation distance in cm")
+
     args = parser.parse_args()
 
     if args.seed is not None:
         np.random.seed(args.seed)
 
-    global MAX_QP_SIMULATED, FANO_SINGLET, FANO_TRIPLET, FANO_IR
+    # --- Apply CLI overrides to module-level config globals ---
+    global DETECTOR_GEOMETRY, FILL_HEIGHT, CELL_RADIUS
+    global QP_WALL_REFLECTION_PROB, QP_WALL_DIFFUSE_PROB, QP_WALL_ANDREEV_PROB
+    global QP_SENSOR_REFLECTION_PROB, QP_SENSOR_DIFFUSE_PROB, QP_SENSOR_ANDREEV_PROB
+    global QP_TEMPERATURE, MAX_QP_SIMULATED
+    global VUV_PHOTON_ENERGY
+    global UV_WALL_REFLECTION_PROB, UV_WALL_DIFFUSE_PROB
+    global UV_SENSOR_REFLECTION_PROB, UV_SENSOR_DIFFUSE_PROB, UV_RAYLEIGH_MFP
+    global IR_ION_WALL_REFLECTION_PROB, IR_ION_WALL_DIFFUSE_PROB
+    global IR_ION_SENSOR_REFLECTION_PROB, IR_ION_SENSOR_DIFFUSE_PROB
+    global IR_EXC_WALL_REFLECTION_PROB, IR_EXC_WALL_DIFFUSE_PROB
+    global IR_EXC_SENSOR_REFLECTION_PROB, IR_EXC_SENSOR_DIFFUSE_PROB
+    global TRIPLET_FLUORESCENCE_YIELD, SINGLET_FRACTION
+    global FANO_SINGLET, FANO_TRIPLET, FANO_IR
+    global STEP_SIZE, MAX_DIST
+
+    # Geometry first: sets DETECTOR_GEOMETRY and recalculates fill_height/cell_radius defaults
+    if args.geometry is not None:
+        DETECTOR_GEOMETRY = args.geometry
+        gd = _GEOMETRY_DEFAULTS[args.geometry]
+        FILL_HEIGHT = gd["fill_height"]
+        CELL_RADIUS = gd["cell_radius"]
+
+    # Explicit fill_height/cell_radius override geometry defaults
+    if args.fill_height is not None:
+        FILL_HEIGHT = args.fill_height
+    if args.cell_radius is not None:
+        CELL_RADIUS = args.cell_radius
+
+    # QP channel
+    if args.qp_wall_refl is not None:
+        QP_WALL_REFLECTION_PROB = args.qp_wall_refl
+    if args.qp_wall_diffuse is not None:
+        QP_WALL_DIFFUSE_PROB = args.qp_wall_diffuse
+    if args.qp_wall_andreev is not None:
+        QP_WALL_ANDREEV_PROB = args.qp_wall_andreev
+    if args.qp_sensor_refl is not None:
+        QP_SENSOR_REFLECTION_PROB = args.qp_sensor_refl
+    if args.qp_sensor_diffuse is not None:
+        QP_SENSOR_DIFFUSE_PROB = args.qp_sensor_diffuse
+    if args.qp_sensor_andreev is not None:
+        QP_SENSOR_ANDREEV_PROB = args.qp_sensor_andreev
+    if args.qp_temperature is not None:
+        QP_TEMPERATURE = args.qp_temperature
     if args.max_qp is not None:
         MAX_QP_SIMULATED = args.max_qp
+
+    # VUV / UV channel
+    if args.vuv_photon_energy is not None:
+        VUV_PHOTON_ENERGY = args.vuv_photon_energy
+    if args.uv_wall_refl is not None:
+        UV_WALL_REFLECTION_PROB = args.uv_wall_refl
+    if args.uv_wall_diffuse is not None:
+        UV_WALL_DIFFUSE_PROB = args.uv_wall_diffuse
+    if args.uv_sensor_refl is not None:
+        UV_SENSOR_REFLECTION_PROB = args.uv_sensor_refl
+    if args.uv_sensor_diffuse is not None:
+        UV_SENSOR_DIFFUSE_PROB = args.uv_sensor_diffuse
+    if args.uv_rayleigh_mfp is not None:
+        UV_RAYLEIGH_MFP = args.uv_rayleigh_mfp
+
+    # IR channel — ionization
+    if args.ir_ion_wall_refl is not None:
+        IR_ION_WALL_REFLECTION_PROB = args.ir_ion_wall_refl
+    if args.ir_ion_wall_diffuse is not None:
+        IR_ION_WALL_DIFFUSE_PROB = args.ir_ion_wall_diffuse
+    if args.ir_ion_sensor_refl is not None:
+        IR_ION_SENSOR_REFLECTION_PROB = args.ir_ion_sensor_refl
+    if args.ir_ion_sensor_diffuse is not None:
+        IR_ION_SENSOR_DIFFUSE_PROB = args.ir_ion_sensor_diffuse
+
+    # IR channel — excitation
+    if args.ir_exc_wall_refl is not None:
+        IR_EXC_WALL_REFLECTION_PROB = args.ir_exc_wall_refl
+    if args.ir_exc_wall_diffuse is not None:
+        IR_EXC_WALL_DIFFUSE_PROB = args.ir_exc_wall_diffuse
+    if args.ir_exc_sensor_refl is not None:
+        IR_EXC_SENSOR_REFLECTION_PROB = args.ir_exc_sensor_refl
+    if args.ir_exc_sensor_diffuse is not None:
+        IR_EXC_SENSOR_DIFFUSE_PROB = args.ir_exc_sensor_diffuse
+
+    # Triplet / singlet
+    if args.triplet_fluorescence_yield is not None:
+        TRIPLET_FLUORESCENCE_YIELD = args.triplet_fluorescence_yield
+    if args.singlet_fraction is not None:
+        SINGLET_FRACTION = args.singlet_fraction
+
+    # Fano factors
     if args.fano_singlet is not None:
         FANO_SINGLET = args.fano_singlet
     if args.fano_triplet is not None:
         FANO_TRIPLET = args.fano_triplet
     if args.fano_ir is not None:
         FANO_IR = args.fano_ir
+
+    # Simulation parameters
+    if args.step_size is not None:
+        STEP_SIZE = args.step_size
+    if args.max_dist is not None:
+        MAX_DIST = args.max_dist
 
     if args.spectrum == "wimp" and args.recoil_type != "NR":
         print("Warning: WIMP spectrum forces recoil_type=NR, ignoring --recoil_type")
@@ -483,6 +675,7 @@ def main():
     detected_count = np.zeros((n_total, 4))
     mean_arrival_time = np.full((n_total, 4), np.nan)
     wimp_mass_labels = np.full(n_total, np.nan)
+    vertex_positions = np.zeros((n_total, 3))
 
     if args.per_sensor:
         sensor_det_energy = np.zeros((n_total, 4, nsensors))
@@ -509,10 +702,11 @@ def main():
         recoil_types[i] = 0 if rtype == "ER" else 1
         wimp_mass_labels[i] = wmass
 
-        n_gen, det_e, det_c, m_time, s_e, s_c, s_t, raw = simulate_event(
+        n_gen, det_e, det_c, m_time, s_e, s_c, s_t, raw, vtx = simulate_event(
             detector, energy, rtype, save_per_sensor=args.per_sensor,
             save_raw=args.save_raw)
         n_quanta_generated[i] = n_gen
+        vertex_positions[i] = vtx
         detected_energy[i] = det_e
         detected_count[i] = det_c
         mean_arrival_time[i] = m_time
@@ -525,6 +719,9 @@ def main():
             evt_grp = h5_events.create_group(str(i))
             evt_grp.attrs['recoil_energy'] = energy
             evt_grp.attrs['recoil_type'] = rtype
+            evt_grp.attrs['vertex_x'] = vtx[0]
+            evt_grp.attrs['vertex_y'] = vtx[1]
+            evt_grp.attrs['vertex_z'] = vtx[2]
             for ch, ch_key in enumerate(channel_keys):
                 if raw[ch] is None:
                     continue
@@ -552,6 +749,7 @@ def main():
         spectrum_mode=np.array(args.spectrum),
         detector_config=np.array(get_detector_config()),
         random_seed=np.array(args.seed if args.seed is not None else -1),
+        vertex_positions=vertex_positions,
     )
 
     if args.per_sensor:

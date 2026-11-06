@@ -29,7 +29,7 @@ def WIMP_dRate(recoilEnergy_eV, mass_MeV):
     #// Convert all velocities from km/s into cm/s
     v_0 = V_WIMP * cmPerkm;      # peak WIMP velocity
     v_esc = V_ESCAPE * cmPerkm;  # escape velocity
-    v_e = (V_SUN + (0.49 * 29.8 * np.cos(-0.415 * 2. * np.pi))) * cmPerkm # the Earth's velocity
+    v_e = V_SUN * cmPerkm  # annual-average lab velocity (Earth modulation averages out)
 
     #// Define the detector Z and A and the mass of the target nucleus
     Z = 2. #ATOM_NUM;
@@ -116,7 +116,7 @@ def WIMP_dRate(recoilEnergy_eV, mass_MeV):
     return dSpec;
 
 
-def WIMP_spectrum_prep(mass_MeV, minE = 21):
+def WIMP_spectrum_prep(mass_MeV, minE = 1):
     test_e = np.geomspace(minE, 10000, 100)
     f = []
     for i in test_e:
@@ -124,6 +124,11 @@ def WIMP_spectrum_prep(mass_MeV, minE = 21):
     f = np.array(f)
 
     cut_off = (f > f[0]/1e7)
+    if not np.any(cut_off):
+        raise ValueError(
+            f"WIMP mass {mass_MeV} MeV produces zero rate above {minE} eV on helium-4. "
+            f"Max recoil energy is below the simulation threshold."
+        )
     maxE = test_e[cut_off][-1]
     return test_e[0], maxE, f[0]
 
