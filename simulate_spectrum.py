@@ -1,5 +1,5 @@
 """
-simulate_spectrum.py — Per-channel HeST signal simulation across energy spectra.
+simulate_spectrum.py — Per-channel HeRM signal simulation across energy spectra.
 
 Simulates singlet, triplet, IR, and quasiparticle/evaporation signals
 independently for each event, recording per-channel detected energy,
@@ -18,6 +18,10 @@ key flags
 --max_qp 100000 --> set max QPs to propagate before reweighting (default is 100K)
 --save_raw --> save full per-quanta arrival times and energies to HDF5 (.h5) file
 --geometry HeRALD_LBNL --> override detector geometry (auto-sets fill_height, cell_radius)
+--vertex_dist {cylinder,point,disk,annulus} --> control event vertex distribution (default: cylinder)
+    point:   --vertex_x 0 --vertex_y 0 --vertex_z 1.5
+    disk:    --vertex_r 1.0 --vertex_z 2.0
+    annulus: --vertex_r_inner 0.5 --vertex_r_outer 1.5 --vertex_z 1.0
 
 All detector configuration parameters (reflection probs, Fano factors, step size, etc.)
 can be overridden from the command line. Run with --help for the full list.
@@ -59,7 +63,7 @@ import time
 import numpy as np
 from tqdm import tqdm
 
-import HeST as H
+import HeRM as H
 
 # ============================================================
 # DETECTOR CONFIGURATION — edit this section before running
@@ -228,7 +232,59 @@ def random_position_in_cylinder(cell_radius, fill_height):
     return x, y, z
 
 
-def simulate_event(detector, energy, recoil_type, save_per_sensor=False,
+def random_position_on_disk(radius, z0):
+    """Sample a uniform random position on a filled disk at height z0."""
+    r = radius * np.sqrt(np.random.random())
+    phi = 2 * np.pi * np.random.random()
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
+    return x, y, z0
+
+
+def random_position_on_annulus(r_inner, r_outer, z0):
+    """Sample a uniform random position on an annulus at height z0."""
+    r = np.sqrt(np.random.uniform(r_inner**2, r_outer**2))
+    phi = 2 * np.pi * np.random.random()
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
+    return x, y, z0
+
+
+def make_vertex_sampler(args):
+    """Build a zero-argument callable that returns (x, y, z) for each event."""
+    dist = args.vertex_dist
+
+    if dist == "cylinder":
+        return lambda: random_position_in_cylinder(CELL_RADIUS, FILL_HEIGHT)
+
+    elif dist == "point":
+        vx = args.vertex_x if args.vertex_x is not None else 0.0
+        vy = args.vertex_y if args.vertex_y is not None else 0.0
+        vz = args.vertex_z if args.vertex_z is not None else FILL_HEIGHT / 2
+        return lambda: (vx, vy, vz)
+
+    elif dist == "disk":
+        radius = args.vertex_r if args.vertex_r is not None else CELL_RADIUS
+        z0 = args.vertex_z if args.vertex_z is not None else FILL_HEIGHT / 2
+        return lambda: random_position_on_disk(radius, z0)
+
+    elif dist == "annulus":
+        if args.vertex_r_inner is None:
+            raise ValueError("--vertex_r_inner is required for annulus distribution")
+        r_inner = args.vertex_r_inner
+        r_outer = args.vertex_r_outer if args.vertex_r_outer is not None else CELL_RADIUS
+        z0 = args.vertex_z if args.vertex_z is not None else FILL_HEIGHT / 2
+        if r_inner >= r_outer:
+            raise ValueError(f"--vertex_r_inner ({r_inner}) must be less than "
+                             f"--vertex_r_outer ({r_outer})")
+        return lambda: random_position_on_annulus(r_inner, r_outer, z0)
+
+    else:
+        raise ValueError(f"Unknown vertex distribution: {dist}")
+
+
+def simulate_event(detector, energy, recoil_type, vertex_sampler=None,
+                   save_per_sensor=False,
                    save_raw=False, fano_singlet=1.0, fano_triplet=1.0, fano_ir=1.0):
     """
     Simulate a single recoil event and return per-channel results.
@@ -242,7 +298,7 @@ def simulate_event(detector, energy, recoil_type, save_per_sensor=False,
     sensor_energy : (4, nsensors) array or None — per-sensor detected energy
     sensor_count  : (4, nsensors) array or None — per-sensor detected count
     sensor_time   : (4, nsensors) array or None — per-sensor mean arrival time
-    raw_signals : list of (HestSignal, weight) or None — raw signal objects per channel
+    raw_signals : list of (HermSignal, weight) or None — raw signal objects per channel
     """
     quanta = H.GetQuanta(energy, recoil_type, T=QP_TEMPERATURE,
                          fano_singlet=fano_singlet, fano_triplet=fano_triplet, fano_IR=fano_ir,
@@ -259,7 +315,10 @@ def simulate_event(detector, energy, recoil_type, save_per_sensor=False,
     det_count = np.zeros(4)
     mean_time = np.full(4, np.nan)
 
-    x, y, z = random_position_in_cylinder(CELL_RADIUS, FILL_HEIGHT)
+    if vertex_sampler is not None:
+        x, y, z = vertex_sampler()
+    else:
+        x, y, z = random_position_in_cylinder(CELL_RADIUS, FILL_HEIGHT)
     nsensors = detector.get_nsensors()
 
     if save_per_sensor:
@@ -279,7 +338,7 @@ def simulate_event(detector, energy, recoil_type, save_per_sensor=False,
     sim_kwargs = dict(max_dist=MAX_DIST, step_size=STEP_SIZE)
 
     def collect_signal(sig, ch_index, weight=1.0):
-        """Extract detected energy, count, and mean time from a HestSignal."""
+        """Extract detected energy, count, and mean time from a HermSignal."""
         for s in range(nsensors):
             if len(sig.energies[s]) > 0:
                 e_s = np.sum(sig.energies[s]) * weight
@@ -311,7 +370,7 @@ def simulate_event(detector, energy, recoil_type, save_per_sensor=False,
             raw_signals[1] = (sig, 1.0)
 
     if n_ir > 0:
-        sig = H.HestSignal([[] for _ in range(nsensors)], [[] for _ in range(nsensors)])
+        sig = H.HermSignal([[] for _ in range(nsensors)], [[] for _ in range(nsensors)])
         if n_ir_ion > 0:
             sig = sig + H.GetIRSignal(detector, n_ir_ion, x, y, z,
                                       photon_energy=H.IR_ENERGY_PER_IONIZATION,
@@ -426,12 +485,28 @@ def generate_output_name(args):
         parts.append(f"seed_{args.seed}")
     parts.append(geom_short)
 
+    if args.vertex_dist != "cylinder":
+        if args.vertex_dist == "point":
+            vx = args.vertex_x if args.vertex_x is not None else 0.0
+            vy = args.vertex_y if args.vertex_y is not None else 0.0
+            vz = args.vertex_z  # resolved later, but may be None here
+            parts.append(f"vtxPoint_{vx}_{vy}_{vz}")
+        elif args.vertex_dist == "disk":
+            vr = args.vertex_r
+            vz = args.vertex_z
+            parts.append(f"vtxDisk_r{vr}_z{vz}")
+        elif args.vertex_dist == "annulus":
+            ri = args.vertex_r_inner
+            ro = args.vertex_r_outer
+            vz = args.vertex_z
+            parts.append(f"vtxAnnulus_ri{ri}_ro{ro}_z{vz}")
+
     return "_".join(parts) + ".npz"
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Per-channel HeST signal simulation across energy spectra.")
+        description="Per-channel HeRM signal simulation across energy spectra.")
     parser.add_argument("--n_events", type=int, default=100,
                         help="MC events per energy point (mono) or total (other modes)")
     parser.add_argument("--recoil_type", required=True,
@@ -533,6 +608,27 @@ def main():
                      help="Ray-marching step size in cm")
     det.add_argument("--max_dist", type=float, default=None,
                      help="Maximum propagation distance in cm")
+
+    # --- Vertex distribution ---
+    vtx = parser.add_argument_group("vertex distribution",
+                                     "Control where events are generated within the cell")
+    vtx.add_argument("--vertex_dist", default="cylinder",
+                     choices=["cylinder", "point", "disk", "annulus"],
+                     help="Vertex distribution: cylinder (uniform in cell, default), "
+                          "point (fixed position), disk (uniform on disk at fixed z), "
+                          "annulus (uniform on annular ring at fixed z)")
+    vtx.add_argument("--vertex_x", type=float, default=None,
+                     help="x-coordinate in cm (point mode, default: 0)")
+    vtx.add_argument("--vertex_y", type=float, default=None,
+                     help="y-coordinate in cm (point mode, default: 0)")
+    vtx.add_argument("--vertex_z", type=float, default=None,
+                     help="z-coordinate in cm (point/disk/annulus, default: fill_height/2)")
+    vtx.add_argument("--vertex_r", type=float, default=None,
+                     help="Disk radius in cm (disk mode, default: cell_radius)")
+    vtx.add_argument("--vertex_r_inner", type=float, default=None,
+                     help="Inner radius in cm (annulus mode, required)")
+    vtx.add_argument("--vertex_r_outer", type=float, default=None,
+                     help="Outer radius in cm (annulus mode, default: cell_radius)")
 
     args = parser.parse_args()
 
@@ -640,6 +736,24 @@ def main():
     if args.max_dist is not None:
         MAX_DIST = args.max_dist
 
+    # Build vertex sampler (after all geometry overrides are applied)
+    vertex_sampler = make_vertex_sampler(args)
+    vtx_desc = args.vertex_dist
+    if args.vertex_dist == "point":
+        vx = args.vertex_x if args.vertex_x is not None else 0.0
+        vy = args.vertex_y if args.vertex_y is not None else 0.0
+        vz = args.vertex_z if args.vertex_z is not None else FILL_HEIGHT / 2
+        vtx_desc = f"point ({vx}, {vy}, {vz}) cm"
+    elif args.vertex_dist == "disk":
+        vr = args.vertex_r if args.vertex_r is not None else CELL_RADIUS
+        vz = args.vertex_z if args.vertex_z is not None else FILL_HEIGHT / 2
+        vtx_desc = f"disk r={vr} cm, z={vz} cm"
+    elif args.vertex_dist == "annulus":
+        ri = args.vertex_r_inner
+        ro = args.vertex_r_outer if args.vertex_r_outer is not None else CELL_RADIUS
+        vz = args.vertex_z if args.vertex_z is not None else FILL_HEIGHT / 2
+        vtx_desc = f"annulus r_inner={ri}, r_outer={ro} cm, z={vz} cm"
+
     if args.spectrum == "wimp" and args.recoil_type != "NR":
         print("Warning: WIMP spectrum forces recoil_type=NR, ignoring --recoil_type")
         args.recoil_type = "NR"
@@ -653,6 +767,7 @@ def main():
     nsensors = detector.get_nsensors()
     print(f"  {nsensors} sensors configured")
     print(f"  Max QPs per event: {MAX_QP_SIMULATED} (downsample & weight if exceeded)")
+    print(f"  Vertex distribution: {vtx_desc}")
 
     print(f"Generating event list (spectrum={args.spectrum})...")
     events = generate_energies(args)
@@ -662,7 +777,7 @@ def main():
     # Warmup run for time estimate
     print("Running warmup event for time estimate...")
     t0 = time.time()
-    simulate_event(detector, 1000.0, "ER")
+    simulate_event(detector, 1000.0, "ER", vertex_sampler=vertex_sampler)
     warmup_time = time.time() - t0
     est_minutes = warmup_time * n_total / 60
     print(f"  ~{warmup_time:.1f}s per event, estimated total: {est_minutes:.0f} minutes")
@@ -703,7 +818,8 @@ def main():
         wimp_mass_labels[i] = wmass
 
         n_gen, det_e, det_c, m_time, s_e, s_c, s_t, raw, vtx = simulate_event(
-            detector, energy, rtype, save_per_sensor=args.per_sensor,
+            detector, energy, rtype, vertex_sampler=vertex_sampler,
+            save_per_sensor=args.per_sensor,
             save_raw=args.save_raw)
         n_quanta_generated[i] = n_gen
         vertex_positions[i] = vtx
@@ -750,6 +866,7 @@ def main():
         detector_config=np.array(get_detector_config()),
         random_seed=np.array(args.seed if args.seed is not None else -1),
         vertex_positions=vertex_positions,
+        vertex_dist=np.array(args.vertex_dist),
     )
 
     if args.per_sensor:

@@ -1,6 +1,6 @@
 Hello world
 
-This is going to be a quick explanation of how to set the HeST simulation to run on unity, as this is not the easiest thing. 
+This is going to be a quick explanation of how to set the HeRM simulation to run on unity, as this is not the easiest thing. 
 
 ## Step One
 go to the URL unity.rc.umass.edu, and look at the getting started with unity.
@@ -31,7 +31,7 @@ _user_name_@_node-hostname_
 
 
 ## Step 4
-Open the folder you care to work on, I suggest always opening up HeST. 
+Open the folder you care to work on, I suggest always opening up HeRM. 
 
 
 

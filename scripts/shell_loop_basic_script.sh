@@ -10,4 +10,4 @@ end=$(((task_id + 1) * 10))
 for ((i=$start; i<$end; i++)); do
     echo $i
 done
-# ./HeST_basic_script.py --file_path="${INPUT_FILE[0]}" --num_qps=1000000  --refl_prob=0.15 --evap_eff="${INPUT_FILE[1]}"
+# ./HeRM_basic_script.py --file_path="${INPUT_FILE[0]}" --num_qps=1000000  --refl_prob=0.15 --evap_eff="${INPUT_FILE[1]}"

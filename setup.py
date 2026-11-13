@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='HeST',
+    name='HeRM',
     version='0.2.0',
-    packages=find_packages(include=["HeST", "HeST.*"]),
+    packages=find_packages(include=["HeRM", "HeRM.*"]),
     install_requires=[ 'numpy', 'scipy', 'detprocess', 'numba'],
     package_data={
-        'HeST': ['dispersion_curves/*.txt', 'dispersion_curves/*.csv', 'dispersion_curves/*.npy'],
+        'HeRM': ['dispersion_curves/*.txt', 'dispersion_curves/*.csv', 'dispersion_curves/*.npy'],
     },
     include_package_data = True
 )
