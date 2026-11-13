@@ -22,6 +22,6 @@ config.py
 #That should mostly take care of the main thing
 *.egg-info/
 *.egg/
-HeST/__pycache__/
+HeRM/__pycache__/
 slurm*.out
 parameters/*

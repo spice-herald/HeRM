@@ -2,7 +2,7 @@ from scipy.interpolate import interpn, interp1d
 import numpy as np
 import re
 import matplotlib.pyplot as plt
-from .HeST_Core import HestSignal, Random_QPmomentum, QP_dispersion, QP_velocity, get_phonon_mom_energy, get_rminus_mom_energy, \
+from .HeRM_Core import HermSignal, Random_QPmomentum, QP_dispersion, QP_velocity, get_phonon_mom_energy, get_rminus_mom_energy, \
                        get_rplus_mom_energy, phonon_momentum, rminus_momentum, rplus_momentum, QuantaResult, GetQuanta, \
                        IR_ENERGY_PER_IONIZATION, IR_ENERGY_PER_EXCITATION, HE_REFRACTIVE_INDEX, \
                        MAXON_MOMENTUM, ROTON_MIN_MOMENTUM, PHONON_EVAP_ONSET, MAX_STABLE_MOMENTUM
@@ -2350,12 +2350,12 @@ def GetEvaporationSignal(detector, QPs, X, Y, Z, useMap=True, T=2.0, track_unsta
             Allow the user to manually set a momentum in keV. Default is random sampling
         verbose : bool
         debug : bool
-            default format the signal as HestSignal() object. If True, print out a bunch of tracking 
+            default format the signal as HermSignal() object. If True, print out a bunch of tracking 
             information that our detectors would normally not be privy to
 
     Returns (default)
     -----------------
-        Signal : HestSignal
+        Signal : HermSignal
             Signal object containing hits times and energy deposits
 
     Returns (if debug == True)
@@ -2428,7 +2428,7 @@ def GetEvaporationSignal(detector, QPs, X, Y, Z, useMap=True, T=2.0, track_unsta
 
     # return Signal(sum(chAreas), chAreas, coincidence, arrivalTimes, bounced_flag = bounce_flag_with_sensor, paths = paths, flavor=flavor_with_sensor, momentums = momentum_hit, arrivals_unsorted = arrival_times)
     if not debug:
-        return HestSignal(energies, arrivalTimes)
+        return HermSignal(energies, arrivalTimes)
     else:
         return energyAtDeath, sensorIdsAll, evaporated, total_time, step_count, initial_momentum, paths
 
@@ -2453,12 +2453,12 @@ def GetSingletSignal(detector, nPhotons, X, Y, Z, max_dist = 10, step_size = .05
             Allow the user to manually set the QP's initial direction's unit vector. Default is isotropy.
         verbose : bool
         debug : bool
-            default format the signal as HestSignal() object. If True, print out a bunch of tracking 
+            default format the signal as HermSignal() object. If True, print out a bunch of tracking 
             information that our detectors would normally not be privy to
 
     Returns (default)
     -----------------
-        Signal : HestSignal
+        Signal : HermSignal
             Signal object containing hits times and energy deposits
 
     Returns (if debug == True)
@@ -2516,7 +2516,7 @@ def GetSingletSignal(detector, nPhotons, X, Y, Z, max_dist = 10, step_size = .05
         arrivalTimes[i] = total_time[hit_sensor_i]
     
     if not debug:
-        return HestSignal(energies, arrivalTimes)
+        return HermSignal(energies, arrivalTimes)
     else:
         return energyAtDeath, sensorIdsAll, total_time, step_count, paths
 
@@ -2557,7 +2557,7 @@ def GetTripletSignal(detector, nTriplets, X,Y,Z, max_dist = 10, step_size = .05,
         arrivalTimes[i] = total_time[hit_sensor_i]
     
     if not debug:
-        return HestSignal(energies, arrivalTimes)
+        return HermSignal(energies, arrivalTimes)
     else:
         return energyAtDeath, sensorIdsAll, total_time, step_count, paths
 
@@ -2586,12 +2586,12 @@ def GetIRSignal(detector, nPhotons, X, Y, Z, max_dist = 10, step_size = .05, use
             Allow the user to manually set the QP's initial direction's unit vector. Default is isotropy.
         verbose : bool
         debug : bool
-            default format the signal as HestSignal() object. If True, print out a bunch of tracking 
+            default format the signal as HermSignal() object. If True, print out a bunch of tracking 
             information that our detectors would normally not be privy to
 
     Returns (default)
     -----------------
-        Signal : HestSignal
+        Signal : HermSignal
             Signal object containing hits times and energy deposits
 
     Returns (if debug == True)
@@ -2653,7 +2653,7 @@ def GetIRSignal(detector, nPhotons, X, Y, Z, max_dist = 10, step_size = .05, use
         arrivalTimes[i] = total_time[hit_sensor_i]
     
     if not debug:
-        return HestSignal(energies, arrivalTimes)
+        return HermSignal(energies, arrivalTimes)
     else:
         return energyAtDeath, sensorIdsAll, total_time, step_count, paths
 
@@ -2707,7 +2707,7 @@ def Simulate(detector, recoil_type, recoil_energy, X, Y, Z, T = 2.,
              track_unstable_QPs = False, max_dist = 10, 
              step_size = 0.05, verbose = False):
     """
-    Full top-to-bottom simulation of HeST, calculating quasiparticle 
+    Full top-to-bottom simulation of HeRM, calculating quasiparticle
     yields and propagating them in time to determine detections.
 
     Parameters
@@ -2728,7 +2728,7 @@ def Simulate(detector, recoil_type, recoil_energy, X, Y, Z, T = 2.,
             When true, code updates after each simulation is finished
     Returns
     -------
-        Signal : HeSTSignal
+        Signal : HermSignal
             Signal object containing energy + timing information of 
             detected quasiparticles
     """
@@ -2736,7 +2736,7 @@ def Simulate(detector, recoil_type, recoil_energy, X, Y, Z, T = 2.,
     Quanta = GetQuanta(recoil_energy, recoil_type, T = T, track_unstable_QPs=track_unstable_QPs)
 
     nsensors = detector.get_nsensors()
-    signal = HestSignal([[] for x in range(nsensors)], [[] for x in range(nsensors)])
+    signal = HermSignal([[] for x in range(nsensors)], [[] for x in range(nsensors)])
 
     if verbose:
         print('Staring Evaporation Sim')

@@ -79,7 +79,7 @@ def generate_waveform(evap):
     """
     cpd1_arrival = evap.arrivalTimes_us[0]
     cpd2_arrival = evap.arrivalTimes_us[1]
-    template = np.load('/home/cveihmeyer_umass_edu/HeST/data/dispersion_curves/shortened_normalized_template.npy')
+    template = np.load('/home/cveihmeyer_umass_edu/HeRM/data/dispersion_curves/shortened_normalized_template.npy')
     template_1 = template[0]
     template_2 = template[1]
     cpd1_hits = np.histogram(cpd1_arrival, bins=12500, range=(0,5000))[0] * 10e-3

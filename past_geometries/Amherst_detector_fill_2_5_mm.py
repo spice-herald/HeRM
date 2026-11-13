@@ -1,4 +1,4 @@
-import HeST.Detection as detection
+import HeRM.Detection as detection
 import os
 import numpy as np
 from numba import jit

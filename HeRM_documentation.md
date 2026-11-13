@@ -1,8 +1,8 @@
 # Documentation
-I'm going to write Documentation for the HeST system, because I feel like it really should have some. When I talk to Greg, I'll see if we want to implement it into the functions themselves (we should).
+I'm going to write Documentation for the HeRM system, because I feel like it really should have some. When I talk to Greg, I'll see if we want to implement it into the functions themselves (we should).
 
 
-## HeST_Core.py 
+## HeRM_Core.py 
 CPD_Signal 
 
 This is a class, dedicated towards finding the response of a CPD to an incident signal, be it either evaporated Helium atoms or photons.
@@ -55,7 +55,7 @@ This is also done for the quasiparticle. Why normalize by the singlet fraction ?
 Returns the number of quasiparticles, and used to return the array of quasiparticle energies
 This is done randomely, this is probably where the 'monte carlo' description comes into play.
 
-I have a specific question about line 248 in HeST_Core
+I have a specific question about line 248 in HeRM_Core
 
 params:
 _energy_: This is the total energy of the quasiparticles. Found by taking the total energy of the event, minus the amount taken by singlet and triplet. 

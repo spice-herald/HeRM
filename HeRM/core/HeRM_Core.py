@@ -85,7 +85,7 @@ class QuantaResult:
         return self.Quasiparticles
     
 
-class HestSignal:
+class HermSignal:
     """
     Signal is an object that 
 
@@ -106,7 +106,7 @@ class HestSignal:
         self.arrivalTimes = arrivalTimes_us #time at which the particle hits the sensor
     
     def __add__(self, other):
-        if isinstance(other, HestSignal):
+        if isinstance(other, HermSignal):
             if ( len(self.energies) == len(other.energies) ) and ( len(self.arrivalTimes) == len(other.arrivalTimes) ):
 
                 new_energies = []
@@ -117,7 +117,7 @@ class HestSignal:
                 for i in range(len(self.arrivalTimes)):
                     new_times.append(np.append(self.arrivalTimes[i], other.arrivalTimes[i]))
                 
-                return HestSignal(new_energies, new_times)
+                return HermSignal(new_energies, new_times)
             
             else:
 

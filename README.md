@@ -1,12 +1,12 @@
-# HeST
+# HeRM
 
-**Helium Simulation Toolkit** — Monte Carlo simulation of energy deposition and signal generation in superfluid helium detectors. Simulates the full chain from particle recoil to sensor signals: energy partitioning, photon and quasiparticle propagation, quantum evaporation, and collection by cryogenic sensors.
+**Helium Response Model** — Monte Carlo simulation of energy deposition and signal generation in superfluid helium detectors. Simulates the full chain from particle recoil to sensor signals: energy partitioning, photon and quasiparticle propagation, quantum evaporation, and collection by cryogenic sensors.
 
 ## Installation
 
 ```bash
-git clone git@github.com:spice-herald/HeST.git
-cd HeST
+git clone git@github.com:spice-herald/HeRM.git
+cd HeRM
 pip install .
 ```
 
@@ -15,7 +15,7 @@ Dependencies: `numpy`, `scipy`, `numba`, `qetpy`, `scikit-image`
 ## Quick start
 
 ```python
-import HeST as H
+import HeRM as H
 
 detector = H.HeRALD_v1(fill_height=4.5)
 signal = H.Simulate(detector, "ER", 1000, 0, 0, 2)  # 1 keV ER at (0,0,2) cm
@@ -58,7 +58,7 @@ Quasiparticles in superfluid helium with specular, diffuse, and Andreev reflecti
 
 | Module | Purpose |
 |---|---|
-| `HeST_Core.py` | Energy partitioning, QP dispersion/velocity, momentum sampling |
+| `HeRM_Core.py` | Energy partitioning, QP dispersion/velocity, momentum sampling |
 | `Detection.py` | Propagation engines, detector/sensor geometry, simulation drivers |
 | `Geometry.py` | Pre-built detector geometries (HeRALD v1, LBNL, UMass variants) |
 | `WIMP_Generation.py` | WIMP recoil spectrum (differential rate, rejection sampling) |
@@ -87,10 +87,15 @@ Runtime: ~10,000 events ≈ 1 hour on a single CPU core.
 | Notebook | Description |
 |---|---|
 | `Channel_Signal_Distributions.ipynb` | Full analysis: yield curves, detector diagrams, 2D discrimination, arrival times |
-| `Hest_basic.ipynb` | QP dispersion, critical angles, ER/NR yields, momentum sampling |
-| `HeST_QP_Sim.ipynb` | Evaporation signal: trajectories, per-sensor maps, wall reflection comparisons |
-| `HeST_Singlet_Sim.ipynb` | Singlet photon propagation: paths, hit positions, reflection comparisons |
+| `HeRM_basic.ipynb` | QP dispersion, critical angles, ER/NR yields, momentum sampling |
+| `HeRM_QP_Sim.ipynb` | Evaporation signal: trajectories, per-sensor maps, wall reflection comparisons |
+| `HeRM_Singlet_Sim.ipynb` | Singlet photon propagation: paths, hit positions, reflection comparisons |
 
 ## Map generation
 
 Pre-computed light collection efficiency (LCE) and quasiparticle evaporation (QPE) maps accelerate simulations. Generate with `processMapsInParallel.py` and merge with `Merge2DMaps.py`. Compute-intensive — best run on a cluster.
+
+## Contact
+
+- Dan Kodroff
+- Will Matava
